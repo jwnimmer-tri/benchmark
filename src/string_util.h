@@ -12,6 +12,25 @@ namespace benchmark {
 
 void AppendHumanReadable(int n, std::string* str);
 
+// HumanReadableNumber formats `n` using an SI or IEC suffix and rounding.
+// There is a 10% margin such that, e.g., 1040 is shown as "1040" not "1.0k".
+//
+// The `one_k` determines whether we are using SI (e.g., kilobytes "k") or IEC
+// (e.g., kibibytes "Ki") per the benchmark::Counter::OneK constants.
+//
+// In the case where the number is small enough to not require a suffix, then
+// exact integers will display without any decimal places and doubles will
+// display with a least 1 digit after the decimal place (to indicate roundoff)
+// and will use at least 2 sig figs. In that case, the longest possible string
+// is size() == 7 (e.g., "-1111.1").
+//
+// If the number uses a suffix, then it will display exactly one decimal place
+// (to indicate roundoff). In that case, the longest possible string is
+// size() == 8 (e.g., "-1111.1M").
+//
+// If the number is more extreme than can be represented via an SI/IEC suffix,
+// then it will display using scientific notation with two sig figs.  In that
+// case, the longest possible string is size() == 9 (e.g., "-1.1e-300").
 std::string HumanReadableNumber(double n, double one_k = 1024.0);
 
 BENCHMARK_EXPORT

@@ -33,55 +33,80 @@ static const int64_t kUnitsSize = arraysize(kBigSIUnits);
 void ToExponentAndMantissa(double val, double thresh, int precision,
                            double one_k, std::string* mantissa,
                            int64_t* exponent) {
-  std::stringstream mantissa_stream;
+  if (val == 0) {
+    *mantissa = "0";
+    *exponent = 0;
+    return;
+  }
 
+  std::stringstream mantissa_stream;
   if (val < 0) {
     mantissa_stream << "-";
     val = -val;
   }
 
-  // Adjust threshold so that it never excludes things which can't be rendered
-  // in 'precision' digits.
-  const double adjusted_threshold =
-      std::max(thresh, 1.0 / std::pow(10.0, precision));
-  const double big_threshold = adjusted_threshold * one_k;
-  const double small_threshold = adjusted_threshold;
-  // Values in ]simple_threshold,small_threshold[ will be printed as-is
-  const double simple_threshold = 0.01;
+  const double big_thresh = thresh * one_k;
+  const double small_thresh = 0.01;
 
-  if (val > big_threshold) {
-    // Positive powers
+  if (val >= big_thresh) {
+    // Sufficiently large number; find a compatible "Big" SI/IEC scale suffix.
     double scaled = val;
     for (size_t i = 0; i < arraysize(kBigSIUnits); ++i) {
       scaled /= one_k;
-      if (scaled <= big_threshold) {
+      if (scaled < big_thresh) {
+        mantissa_stream << std::fixed;
+        mantissa_stream.precision(precision);
         mantissa_stream << scaled;
         *exponent = i + 1;
         *mantissa = mantissa_stream.str();
         return;
       }
     }
-    mantissa_stream << val;
+    // The value exceeds any possible scale. Use scientific notation.
     *exponent = 0;
-  } else if (val < small_threshold) {
-    // Negative powers
-    if (val < simple_threshold) {
-      double scaled = val;
-      for (size_t i = 0; i < arraysize(kSmallSIUnits); ++i) {
-        scaled *= one_k;
-        if (scaled >= small_threshold) {
-          mantissa_stream << scaled;
-          *exponent = -static_cast<int64_t>(i + 1);
-          *mantissa = mantissa_stream.str();
-          return;
-        }
+    mantissa_stream << std::scientific;
+    mantissa_stream.precision(precision);
+    mantissa_stream << val;
+  } else if (val >= small_thresh) {
+    // The number will not use a suffix, just the precision. Integers counters
+    // ignore the precision.
+    *exponent = 0;
+    double unused;
+    if (std::modf(val, &unused) != 0) {
+      mantissa_stream << std::fixed;
+      if (precision == 0) {
+        mantissa_stream.precision(0);
+      } else if (val >= 10) {
+        mantissa_stream.precision(precision);
+      } else if (val >= 0.1) {
+        // Use a third sig fig for numbers near one (e.g., 1.02 vs 1.0, or
+        // 0.12 vs 0.1).
+        mantissa_stream.precision(precision + 1);
+      } else {
+        // Ensure two sig figs for hundreths-scale numbers (e.g., 0.012 vs 0.1).
+        mantissa_stream.precision(precision + 2);
       }
     }
     mantissa_stream << val;
-    *exponent = 0;
   } else {
-    mantissa_stream << val;
+    // Sufficiently small number; find a compatible "Small" SI/IEC scale suffix.
+    double scaled = val;
+    for (size_t i = 0; i < arraysize(kSmallSIUnits); ++i) {
+      scaled *= one_k;
+      if (scaled >= thresh) {
+        mantissa_stream << std::fixed;
+        mantissa_stream.precision(precision);
+        mantissa_stream << scaled;
+        *exponent = -static_cast<int64_t>(i + 1);
+        *mantissa = mantissa_stream.str();
+        return;
+      }
+    }
+    // The value exceeds any possible scale. Use scientific notation.
     *exponent = 0;
+    mantissa_stream << std::scientific;
+    mantissa_stream.precision(precision);
+    mantissa_stream << val;
   }
   *mantissa = mantissa_stream.str();
 }
@@ -106,7 +131,7 @@ std::string ToBinaryStringFullySpecified(double value, double threshold,
   int64_t exponent;
   ToExponentAndMantissa(value, threshold, precision, one_k, &mantissa,
                         &exponent);
-  return mantissa + ExponentToPrefix(exponent, false);
+  return mantissa + ExponentToPrefix(exponent, (one_k == 1024));
 }
 
 }  // end namespace

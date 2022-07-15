@@ -45,7 +45,7 @@ SubMap& GetSubstitutions() {
   static SubMap map = {
       {"%float", "[0-9]*[.]?[0-9]+([eE][-+][0-9]+)?"},
       // human-readable float
-      {"%hrfloat", "[0-9]*[.]?[0-9]+([eE][-+][0-9]+)?[kMGTPEZYmunpfazy]?"},
+      {"%hrfloat", "[0-9]*[.]?[0-9]+([eE][-+][0-9]+)?[KkMGTPEZYmunpfazy]?i?"},
       {"%percentage", percentage_re},
       {"%int", "[ ]*[0-9]+"},
       {" %s ", "[ ]+"},
@@ -428,6 +428,7 @@ void RunOutputTests(int argc, char* argv[]) {
 
     std::cerr << rep_test.err_stream.str();
     std::cout << rep_test.out_stream.str();
+    std::cout.flush();
 
     internal::CheckCases(rep_test.error_cases, rep_test.err_stream);
     internal::CheckCases(rep_test.output_cases, rep_test.out_stream);
